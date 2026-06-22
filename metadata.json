@@ -1,6 +1,6 @@
 {
   "name": "Sayan's Initiative",
-  "description": "Sayan's Initiative is a monthly study planner app where users complete 30-day modules to unlock subsequent months, tracking streaks, dashboard stats, and progress.",
+  "description": "Sayan's Initiative is a highly polished daily exam-preparation tracker where users select custom focus syllabus areas, track daily consistency ratios, and map performance trends in a monthly calendar overview.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

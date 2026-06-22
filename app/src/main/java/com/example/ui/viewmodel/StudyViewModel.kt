@@ -4,23 +4,36 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.StudyDatabase
-import com.example.data.model.StudyDay
+import com.example.data.model.Category
+import com.example.data.model.DailyTask
 import com.example.data.model.UserStats
-import com.example.data.model.CustomTask
+import com.example.data.model.DateUtils
 import com.example.data.repository.StudyRepositoryImpl
 import com.example.domain.repository.StudyRepository
-import com.example.ui.receiver.ReminderReceiver
+import com.example.data.remote.FirestoreManager
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-
 import android.content.Context
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class StudyViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repository: StudyRepository = StudyRepositoryImpl(StudyDatabase.getDatabase(application).studyDao())
-    
+    private val repository: StudyRepository = StudyRepositoryImpl(
+        StudyDatabase.getDatabase(application).studyDao()
+    )
+
     private val prefs = application.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
-    
+
+    init {
+        FirestoreManager.initialize(application)
+    }
+
+    // Cloud Synchronizer stats
+    val cloudSyncId = MutableStateFlow(FirestoreManager.getUserId(application))
+    val cloudSyncLastTime = MutableStateFlow(FirestoreManager.getLastSyncTime(application))
+    val cloudSyncStatus = MutableStateFlow<String>("IDLE")
+
     private val _isDarkTheme = MutableStateFlow(prefs.getBoolean("is_dark_theme", true))
     val isDarkTheme: StateFlow<Boolean> = _isDarkTheme.asStateFlow()
 
@@ -28,23 +41,43 @@ class StudyViewModel(application: Application) : AndroidViewModel(application) {
         _isDarkTheme.value = enabled
         prefs.edit().putBoolean("is_dark_theme", enabled).apply()
     }
-    
-    // UI trigger for celebration confetti
-    private val _celebratedMonth = MutableStateFlow<Int?>(null)
-    val celebratedMonth: StateFlow<Int?> = _celebratedMonth.asStateFlow()
 
-    // Screen selection triggers or filterings
-    private val _vibeTheme = MutableStateFlow("dark_slate") // Dark slate theme preference
-    val vibeTheme: StateFlow<String> = _vibeTheme.asStateFlow()
-
-    // Main States
-    val allDays: StateFlow<List<StudyDay>> = repository.getAllStudyDays()
+    // Categories List
+    val categories: StateFlow<List<Category>> = repository.getAllCategories()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
 
+    // Current selected date for view/handling tasks (defaults to today)
+    private val _selectedDate = MutableStateFlow(DateUtils.getTodayString())
+    val selectedDate: StateFlow<String> = _selectedDate.asStateFlow()
+
+    fun selectDate(dateStr: String) {
+        _selectedDate.value = dateStr
+    }
+
+    // All daily tasks across all dates (for calendar visualizer & stats)
+    val allDailyTasks: StateFlow<List<DailyTask>> = repository.getAllDailyTasks()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    // Daily tasks filtered for the selected date
+    val dailyTasksForSelectedDate: StateFlow<List<DailyTask>> = _selectedDate
+        .flatMapLatest { date ->
+            repository.getDailyTasksForDate(date)
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    // User Profile Stats
     val stats: StateFlow<UserStats?> = repository.getUserStats()
         .stateIn(
             scope = viewModelScope,
@@ -52,86 +85,12 @@ class StudyViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = null
         )
 
-    val allCustomTasks: StateFlow<List<CustomTask>> = repository.getAllCustomTasks()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
-
-    // Derived states
-    val monthlyProgress: StateFlow<Map<Int, Double>> = allDays
-        .map { days ->
-            val progressMap = mutableMapOf<Int, Double>()
-            for (m in 1..12) {
-                val mDays = days.filter { it.month == m }
-                if (mDays.isEmpty()) {
-                    progressMap[m] = 0.0
-                } else {
-                    val completed = mDays.count { it.isCompleted }
-                    progressMap[m] = completed.toDouble() / mDays.size
-                }
-            }
-            progressMap
-        }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyMap()
-        )
-
-    val unlockedMonths: StateFlow<Set<Int>> = monthlyProgress
-        .map { progress ->
-            val unlocked = mutableSetOf(1) // Month 1 is unlocked by default
-            for (m in 2..12) {
-                val previousMonthProgress = progress[m - 1] ?: 0.0
-                if (previousMonthProgress >= 1.0) {
-                    unlocked.add(m)
-                } else {
-                    break // Remaining months stay locked
-                }
-            }
-            unlocked
-        }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = setOf(1)
-        )
-
-    val currentMonth: StateFlow<Int> = unlockedMonths
-        .map { unlocked ->
-            unlocked.maxOrNull() ?: 1
-        }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = 1
-        )
-
-    val todayTask: StateFlow<StudyDay?> = combine(allDays, currentMonth) { days, activeMonth ->
-        // Today's task is the first incomplete day of the currently active unlocked month
-        days.filter { it.month == activeMonth && !it.isCompleted }
-            .minByOrNull { it.dayIndex }
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = null
-    )
-
-    // Statistics Derived
-    val completedDaysCount: StateFlow<Int> = allDays
-        .map { days -> days.count { it.isCompleted } }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = 0
-        )
-
-    val overallProgress: StateFlow<Double> = allDays
-        .map { days ->
-            if (days.isEmpty()) 0.0
-            else days.count { it.isCompleted }.toDouble() / days.size
+    // Derived: Selected Date Consistency Ratio
+    val selectedDateConsistencyRatio: StateFlow<Double> = dailyTasksForSelectedDate
+        .map { tasks ->
+            if (tasks.isEmpty()) return@map 0.0
+            val completed = tasks.count { it.isCompleted }
+            (completed.toDouble() / tasks.size) * 100.0
         }
         .stateIn(
             scope = viewModelScope,
@@ -139,122 +98,185 @@ class StudyViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = 0.0
         )
 
-    init {
-        // Automatically sync custom tasks reminders with system alarms
-        viewModelScope.launch {
-            allCustomTasks.collect { tasks ->
-                tasks.forEach { task ->
-                    if (task.isReminderEnabled && !task.isCompleted) {
-                        ReminderReceiver.scheduleTaskAlarm(
-                            application,
-                            task.id,
-                            task.title,
-                            task.category,
-                            task.date,
-                            task.startTime
-                        )
-                    } else {
-                        ReminderReceiver.cancelTaskAlarm(application, task.id)
-                    }
+    // Derived: Overall consistency ratio across all days that have at least one task selected
+    val overallConsistencyRatio: StateFlow<Double> = repository.getAllDailyTasks()
+        .map { allTasks ->
+            val grouped = allTasks.groupBy { it.date }
+            if (grouped.isEmpty()) return@map 0.0
+
+            var totalRatiosSum = 0.0
+            var validDaysCount = 0
+
+            for ((_, dayTasks) in grouped) {
+                if (dayTasks.isNotEmpty()) {
+                    val completed = dayTasks.count { it.isCompleted }
+                    val ratio = (completed.toDouble() / dayTasks.size) * 100.0
+                    totalRatiosSum += ratio
+                    validDaysCount++
                 }
             }
+            if (validDaysCount == 0) 0.0 else totalRatiosSum / validDaysCount
         }
-    }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = 0.0
+        )
 
-    // User actions
-    fun toggleDayCompletion(day: StudyDay) {
+    // Cloud Synchronizer Actions
+    fun triggerCloudBackup() {
         viewModelScope.launch {
-            val wasIncomplete = !day.isCompleted
-            val month = day.month
-
-            // Before marking, check what the progress of this month is
-            val allCurrentDays = allDays.value
-            val monthDaysBefore = allCurrentDays.filter { it.month == month }
-            val completedBefore = monthDaysBefore.count { it.isCompleted }
-
-            // Save in DB
-            repository.completeDay(day, wasIncomplete)
-
-            // Check if this action completes the month 100%
-            if (wasIncomplete && completedBefore == monthDaysBefore.size - 1) {
-                // Newly completed month!
-                _celebratedMonth.value = month
+            try {
+                val currentStats = repository.getUserStatsSync()
+                val currentCategories = repository.getAllCategoriesSync()
+                val currentTasks = repository.getAllDailyTasksSync()
+                FirestoreManager.uploadData(
+                    context = getApplication(),
+                    stats = currentStats,
+                    categories = currentCategories,
+                    tasks = currentTasks
+                )
+                cloudSyncLastTime.value = FirestoreManager.getLastSyncTime(getApplication())
+            } catch (e: Exception) {
+                android.util.Log.e("StudyViewModel", "Auto-backup to cloud failed: ${e.message}")
             }
         }
     }
 
-    fun logFocusTime(minutes: Int) {
+    fun manualCloudBackup() {
+        cloudSyncStatus.value = "SYNCING"
         viewModelScope.launch {
-            val currentStats = stats.value ?: UserStats()
-            val updated = currentStats.copy(
-                totalFocusMinutes = currentStats.totalFocusMinutes + minutes
-            )
-            repository.saveUserStats(updated)
+            try {
+                val currentStats = repository.getUserStatsSync()
+                val currentCategories = repository.getAllCategoriesSync()
+                val currentTasks = repository.getAllDailyTasksSync()
+                val success = FirestoreManager.uploadData(
+                    context = getApplication(),
+                    stats = currentStats,
+                    categories = currentCategories,
+                    tasks = currentTasks
+                )
+                if (success) {
+                    cloudSyncStatus.value = "SUCCESS_BACKUP"
+                    cloudSyncLastTime.value = FirestoreManager.getLastSyncTime(getApplication())
+                } else {
+                    cloudSyncStatus.value = "ERROR"
+                }
+            } catch (e: Exception) {
+                cloudSyncStatus.value = "ERROR"
+            }
         }
     }
 
-    fun dismissCelebration() {
-        _celebratedMonth.value = null
+    fun manualCloudRestore(customId: String? = null) {
+        val targetId = customId?.trim() ?: cloudSyncId.value.trim()
+        if (targetId.length < 3) {
+            cloudSyncStatus.value = "ERROR"
+            return
+        }
+        cloudSyncStatus.value = "SYNCING"
+        viewModelScope.launch {
+            try {
+                val data = FirestoreManager.downloadData(getApplication(), targetId)
+                if (data != null) {
+                    repository.restoreCloudData(
+                        userName = data.userName,
+                        userDob = data.userDob,
+                        profilePictureUri = data.profilePictureUri,
+                        categories = data.categories,
+                        dailyTasks = data.dailyTasks
+                    )
+                    FirestoreManager.updateUserId(getApplication(), targetId)
+                    cloudSyncId.value = targetId
+                    cloudSyncLastTime.value = FirestoreManager.getLastSyncTime(getApplication())
+                    cloudSyncStatus.value = "SUCCESS_RESTORE"
+                } else {
+                    cloudSyncStatus.value = "ERROR"
+                }
+            } catch (e: Exception) {
+                cloudSyncStatus.value = "ERROR"
+            }
+        }
     }
 
-    fun updateReminderTime(hour: Int, minute: Int, enabled: Boolean) {
-        viewModelScope.launch {
-            val currentStats = stats.value ?: UserStats()
-            val updated = currentStats.copy(
-                reminderHour = hour,
-                reminderMinute = minute,
-                isReminderEnabled = enabled
-            )
-            repository.saveUserStats(updated)
+    fun updateSyncUserId(newId: String) {
+        val trimmed = newId.trim()
+        if (trimmed.length >= 3) {
+            FirestoreManager.updateUserId(getApplication(), trimmed)
+            cloudSyncId.value = trimmed
+        }
+    }
 
-            // Trigger actual system Alarm update
-            val app = getApplication<Application>()
-            if (enabled) {
-                ReminderReceiver.scheduleAlarm(app, hour, minute)
+    fun resetSyncStatus() {
+        cloudSyncStatus.value = "IDLE"
+    }
+
+    // Category Management Actions
+    fun addCategory(name: String) {
+        val trimmed = name.trim()
+        if (trimmed.isBlank()) return
+        viewModelScope.launch {
+            repository.insertCategory(Category(name = trimmed))
+            triggerCloudBackup()
+        }
+    }
+
+    fun deleteCategory(category: Category) {
+        viewModelScope.launch {
+            repository.deleteCategory(category)
+            triggerCloudBackup()
+        }
+    }
+
+    // Toggle selected state of category for the given date
+    fun toggleCategorySelectionForDate(date: String, categoryName: String, isSelected: Boolean) {
+        viewModelScope.launch {
+            if (isSelected) {
+                val currentTasks = repository.getDailyTasksForDateSync(date)
+                if (currentTasks.none { it.categoryName == categoryName }) {
+                    repository.insertDailyTask(
+                        DailyTask(
+                            date = date,
+                            categoryName = categoryName,
+                            isCompleted = false
+                        )
+                    )
+                }
             } else {
-                ReminderReceiver.cancelAlarm(app)
+                repository.deleteDailyTaskByDetails(date, categoryName)
             }
+            triggerCloudBackup()
         }
     }
 
+    // Toggle daily task's checkbox completion status
+    fun toggleDailyTaskCompletion(task: DailyTask) {
+        viewModelScope.launch {
+            repository.updateDailyTask(task.copy(isCompleted = !task.isCompleted))
+            triggerCloudBackup()
+        }
+    }
+
+    // Update user profile info
+    fun updateUserProfile(name: String, dob: String, picUri: String?) {
+        viewModelScope.launch {
+            val currentStats = stats.value ?: UserStats()
+            val updated = currentStats.copy(
+                userName = name,
+                userDob = dob,
+                profilePictureUri = picUri
+            )
+            repository.saveUserStats(updated)
+            triggerCloudBackup()
+        }
+    }
+
+    // Hard reset of database to default categories, clearing all tasks and profile details
     fun forceReset() {
         viewModelScope.launch {
             repository.resetProgress()
-            val app = getApplication<Application>()
-            // Restart default reminder at 9:00 AM
-            ReminderReceiver.scheduleAlarm(app, 9, 0)
-        }
-    }
-
-    // Custom Task methods
-    fun insertCustomTask(task: CustomTask) {
-        viewModelScope.launch {
-            repository.insertCustomTask(task)
-            
-            // If reminder is enabled, schedule a reminder notification
-            if (task.isReminderEnabled) {
-                // For simplicity, schedule an alarm or custom notification trigger.
-                // We will reuse the existing ReminderReceiver or a simple reminder handler.
-            }
-        }
-    }
-
-    fun updateCustomTask(task: CustomTask) {
-        viewModelScope.launch {
-            repository.updateCustomTask(task)
-        }
-    }
-
-    fun deleteCustomTask(task: CustomTask) {
-        viewModelScope.launch {
-            repository.deleteCustomTask(task)
-        }
-    }
-
-    fun toggleCustomTaskCompletion(task: CustomTask) {
-        viewModelScope.launch {
-            val updated = task.copy(isCompleted = !task.isCompleted)
-            repository.updateCustomTask(updated)
+            _selectedDate.value = DateUtils.getTodayString()
+            triggerCloudBackup()
         }
     }
 }

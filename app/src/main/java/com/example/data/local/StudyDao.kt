@@ -1,28 +1,55 @@
 package com.example.data.local
 
 import androidx.room.*
-import com.example.data.model.StudyDay
+import com.example.data.model.Category
+import com.example.data.model.DailyTask
 import com.example.data.model.UserStats
-import com.example.data.model.CustomTask
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface StudyDao {
-    @Query("SELECT * FROM study_days ORDER BY dayId ASC")
-    fun getAllStudyDays(): Flow<List<StudyDay>>
+    // Categories
+    @Query("SELECT * FROM categories ORDER BY name ASC")
+    fun getAllCategories(): Flow<List<Category>>
 
-    @Query("SELECT * FROM study_days WHERE month = :month ORDER BY dayIndex ASC")
-    fun getDaysByMonth(month: Int): Flow<List<StudyDay>>
-
-    @Query("SELECT * FROM study_days WHERE dayId = :dayId LIMIT 1")
-    suspend fun getStudyDayById(dayId: Int): StudyDay?
+    @Query("SELECT * FROM categories ORDER BY name ASC")
+    suspend fun getAllCategoriesSync(): List<Category>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAllDays(days: List<StudyDay>)
+    suspend fun insertCategory(category: Category)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCategories(categories: List<Category>)
+
+    @Delete
+    suspend fun deleteCategory(category: Category)
+
+    // Daily Tasks
+    @Query("SELECT * FROM daily_tasks ORDER BY date ASC")
+    fun getAllDailyTasks(): Flow<List<DailyTask>>
+
+    @Query("SELECT * FROM daily_tasks ORDER BY date ASC")
+    suspend fun getAllDailyTasksSync(): List<DailyTask>
+
+    @Query("SELECT * FROM daily_tasks WHERE date = :date")
+    fun getDailyTasksForDate(date: String): Flow<List<DailyTask>>
+
+    @Query("SELECT * FROM daily_tasks WHERE date = :date")
+    suspend fun getDailyTasksForDateSync(date: String): List<DailyTask>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDailyTask(task: DailyTask)
 
     @Update
-    suspend fun updateStudyDay(day: StudyDay)
+    suspend fun updateDailyTask(task: DailyTask)
 
+    @Delete
+    suspend fun deleteDailyTask(task: DailyTask)
+
+    @Query("DELETE FROM daily_tasks WHERE date = :date AND categoryName = :categoryName")
+    suspend fun deleteDailyTaskByDetails(date: String, categoryName: String)
+
+    // User Stats
     @Query("SELECT * FROM user_stats WHERE id = 1 LIMIT 1")
     fun getUserStats(): Flow<UserStats?>
 
@@ -32,22 +59,13 @@ interface StudyDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertUserStats(stats: UserStats)
 
-    @Update
-    suspend fun updateUserStats(stats: UserStats)
+    // Reset operations
+    @Query("DELETE FROM categories")
+    suspend fun clearCategories()
 
-    // Custom Task operations
-    @Query("SELECT * FROM custom_tasks ORDER BY date ASC, startTime ASC")
-    fun getAllCustomTasks(): Flow<List<CustomTask>>
+    @Query("DELETE FROM daily_tasks")
+    suspend fun clearDailyTasks()
 
-    @Query("SELECT * FROM custom_tasks WHERE date = :date ORDER BY startTime ASC")
-    fun getCustomTasksByDate(date: String): Flow<List<CustomTask>>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertCustomTask(task: CustomTask)
-
-    @Update
-    suspend fun updateCustomTask(task: CustomTask)
-
-    @Delete
-    suspend fun deleteCustomTask(task: CustomTask)
+    @Query("DELETE FROM user_stats")
+    suspend fun clearUserStats()
 }

@@ -2,29 +2,55 @@ package com.example.data.repository
 
 import com.example.data.local.DatabaseInitializer
 import com.example.data.local.StudyDao
-import com.example.data.model.StudyDay
+import com.example.data.model.Category
+import com.example.data.model.DailyTask
 import com.example.data.model.UserStats
-import com.example.data.model.CustomTask
 import com.example.domain.repository.StudyRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.onStart
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Date
-import java.util.Locale
 
 class StudyRepositoryImpl(private val studyDao: StudyDao) : StudyRepository {
 
-    override fun getAllStudyDays(): Flow<List<StudyDay>> {
-        return studyDao.getAllStudyDays().onStart {
-            ensureDatabasePrepopulated()
+    override fun getAllCategories(): Flow<List<Category>> {
+        return studyDao.getAllCategories().onStart {
+            ensureUserStatsInitialized()
         }
     }
 
-    override fun getDaysByMonth(month: Int): Flow<List<StudyDay>> {
-        return studyDao.getDaysByMonth(month).onStart {
-            ensureDatabasePrepopulated()
-        }
+    override fun getAllDailyTasks(): Flow<List<DailyTask>> {
+        return studyDao.getAllDailyTasks()
+    }
+
+    override fun getDailyTasksForDate(date: String): Flow<List<DailyTask>> {
+        return studyDao.getDailyTasksForDate(date)
+    }
+
+    override suspend fun getDailyTasksForDateSync(date: String): List<DailyTask> {
+        return studyDao.getDailyTasksForDateSync(date)
+    }
+
+    override suspend fun insertCategory(category: Category) {
+        studyDao.insertCategory(category)
+    }
+
+    override suspend fun deleteCategory(category: Category) {
+        studyDao.deleteCategory(category)
+    }
+
+    override suspend fun insertDailyTask(task: DailyTask) {
+        studyDao.insertDailyTask(task)
+    }
+
+    override suspend fun updateDailyTask(task: DailyTask) {
+        studyDao.updateDailyTask(task)
+    }
+
+    override suspend fun deleteDailyTask(task: DailyTask) {
+        studyDao.deleteDailyTask(task)
+    }
+
+    override suspend fun deleteDailyTaskByDetails(date: String, categoryName: String) {
+        studyDao.deleteDailyTaskByDetails(date, categoryName)
     }
 
     override fun getUserStats(): Flow<UserStats?> {
@@ -37,127 +63,84 @@ class StudyRepositoryImpl(private val studyDao: StudyDao) : StudyRepository {
         studyDao.insertUserStats(stats)
     }
 
-    private suspend fun ensureDatabasePrepopulated() {
-        // Run check sync
-        val stats = studyDao.getUserStatsSync()
-        // Simple heuristic: if we have zero study days, populate them
-        // Let's first verify if we have empty days table
-        // We can do this safely by getting first day or writing a count query or checking stats availability
-        // If we don't have basic entries, we populate
-        val studyDayCheck = studyDao.getStudyDayById(1)
-        if (studyDayCheck == null) {
-            val prebuiltDays = DatabaseInitializer.generateDays()
-            studyDao.insertAllDays(prebuiltDays)
+    override suspend fun getUserStatsSync(): UserStats? {
+        return studyDao.getUserStatsSync()
+    }
+
+    override suspend fun getAllCategoriesSync(): List<Category> {
+        return studyDao.getAllCategoriesSync()
+    }
+
+    override suspend fun getAllDailyTasksSync(): List<DailyTask> {
+        return studyDao.getAllDailyTasksSync()
+    }
+
+    override suspend fun restoreCloudData(
+        userName: String,
+        userDob: String,
+        profilePictureUri: String?,
+        categories: List<String>,
+        dailyTasks: List<DailyTask>
+    ) {
+        // Clear existing tables
+        studyDao.clearCategories()
+        studyDao.clearDailyTasks()
+        studyDao.clearUserStats()
+
+        // Insert restored categories
+        val restoredCategories = categories.map { Category(name = it) }
+        studyDao.insertCategories(restoredCategories)
+
+        // Insert restored tasks
+        for (task in dailyTasks) {
+            studyDao.insertDailyTask(task)
         }
+
+        // Insert restored user profile stats
+        studyDao.insertUserStats(
+            UserStats(
+                id = 1,
+                userName = userName,
+                userDob = userDob,
+                profilePictureUri = profilePictureUri
+            )
+        )
     }
 
     private suspend fun ensureUserStatsInitialized() {
         val stats = studyDao.getUserStatsSync()
         if (stats == null) {
+            // Prepopulate 7 default categories
+            val defaults = DatabaseInitializer.generateDefaultCategories()
+            studyDao.insertCategories(defaults)
+
+            // Prepopulate UserStats
             studyDao.insertUserStats(
                 UserStats(
                     id = 1,
-                    streakCount = 0,
-                    lastCompletionDate = null,
-                    reminderHour = 9,
-                    reminderMinute = 0,
-                    isReminderEnabled = true
+                    userName = "",
+                    userDob = "",
+                    profilePictureUri = null
                 )
             )
         }
-    }
-
-    override suspend fun completeDay(day: StudyDay, isCompleted: Boolean): Boolean {
-        // Get existing day
-        val existing = studyDao.getStudyDayById(day.dayId) ?: return false
-        
-        val updatedDay = existing.copy(
-            isCompleted = isCompleted,
-            completionTimestamp = if (isCompleted) System.currentTimeMillis() else null
-        )
-        studyDao.updateStudyDay(updatedDay)
-
-        // Handle stats and streak logic
-        val stats = studyDao.getUserStatsSync() ?: UserStats()
-        if (isCompleted) {
-            val todayStr = getCurrentDateString()
-            val lastDateStr = stats.lastCompletionDate
-
-            val newStreak = when {
-                lastDateStr == null -> 1
-                lastDateStr == todayStr -> stats.streakCount // Checked in today already, maintain
-                isYesterday(lastDateStr) -> stats.streakCount + 1 // Consecutive, increment
-                else -> 1 // Gap exists, reset to 1
-            }
-
-            studyDao.updateUserStats(
-                stats.copy(
-                    streakCount = newStreak,
-                    lastCompletionDate = todayStr
-                )
-            )
-        } else {
-            // Decrementing or marking incomplete. We keep streak or if last date was today, we check if other days are completed today
-            // Just for simplicity, we don't forcefully wipe streaks unless necessary
-        }
-        return true
     }
 
     override suspend fun resetProgress() {
-        // Reset all days
-        val prebuiltDays = DatabaseInitializer.generateDays()
-        studyDao.insertAllDays(prebuiltDays)
-        // Reset stats
+        studyDao.clearCategories()
+        studyDao.clearDailyTasks()
+        studyDao.clearUserStats()
+
+        // Re-inject defaults
+        val defaults = DatabaseInitializer.generateDefaultCategories()
+        studyDao.insertCategories(defaults)
         studyDao.insertUserStats(
             UserStats(
                 id = 1,
-                streakCount = 0,
-                lastCompletionDate = null,
-                reminderHour = 9,
-                reminderMinute = 0,
-                isReminderEnabled = true
+                userName = "",
+                userDob = "",
+                profilePictureUri = null
             )
         )
-    }
-
-    // Helper functions for Streak calculation
-    private fun getCurrentDateString(): String {
-        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-        return sdf.format(Date())
-    }
-
-    private fun isYesterday(dateStr: String): Boolean {
-        return try {
-            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-            val parsedDate = sdf.parse(dateStr) ?: return false
-            
-            val calendar = Calendar.getInstance()
-            calendar.add(Calendar.DAY_OF_YEAR, -1)
-            
-            val yesterdayStr = sdf.format(calendar.time)
-            yesterdayStr == dateStr
-        } catch (e: Exception) {
-            false
-        }
-    }
-
-    override fun getAllCustomTasks(): Flow<List<CustomTask>> {
-        return studyDao.getAllCustomTasks()
-    }
-
-    override fun getCustomTasksByDate(date: String): Flow<List<CustomTask>> {
-        return studyDao.getCustomTasksByDate(date)
-    }
-
-    override suspend fun insertCustomTask(task: CustomTask) {
-        studyDao.insertCustomTask(task)
-    }
-
-    override suspend fun updateCustomTask(task: CustomTask) {
-        studyDao.updateCustomTask(task)
-    }
-
-    override suspend fun deleteCustomTask(task: CustomTask) {
-        studyDao.deleteCustomTask(task)
     }
 }
