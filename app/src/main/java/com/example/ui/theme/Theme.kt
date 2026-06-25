@@ -9,41 +9,51 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.platform.LocalView
+import android.app.Activity
+import androidx.core.view.WindowCompat
+import androidx.compose.ui.graphics.toArgb
 
 private val DarkColorScheme = darkColorScheme(
-    primary = SophisticatedPrimary,
-    secondary = SophisticatedSecondary,
-    tertiary = SophisticatedTertiary,
-    background = SophisticatedBg,
-    surface = SophisticatedSurface,
-    surfaceVariant = SophisticatedSurfaceVariant,
-    onPrimary = SophisticatedOnPrimary,
-    onSecondary = SophisticatedBg,
-    onTertiary = SophisticatedBg,
-    onBackground = SophisticatedOnBackground,
-    onSurface = SophisticatedOnSurface,
-    primaryContainer = SophisticatedPrimaryContainer,
-    onPrimaryContainer = SophisticatedOnPrimaryContainer,
-    outline = SophisticatedBorder,
-    outlineVariant = SophisticatedBorder
+    primary = BrandPrimaryDark,
+    secondary = BrandSecondaryDark,
+    tertiary = BrandTertiaryDark,
+    background = BrandBackgroundDark,
+    surface = BrandSurfaceDark,
+    surfaceVariant = BrandSurfaceVariantDark,
+    onPrimary = Color(0xFF11161B),
+    onSecondary = Color(0xFF11161B),
+    onTertiary = Color(0xFF11161B),
+    onBackground = BrandOnBackgroundDark,
+    onSurface = BrandOnSurfaceDark,
+    onSurfaceVariant = BrandOnSurfaceVariantDark,
+    primaryContainer = BrandPrimaryContainerDark,
+    onPrimaryContainer = BrandOnPrimaryContainerDark,
+    outline = BrandOutlineDark,
+    outlineVariant = BrandOutlineVariantDark
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = CohesiveLightPrimary,
-    secondary = CohesiveLightSecondary,
-    tertiary = CohesiveLightTertiary,
-    background = CohesiveLightBg,
-    surface = CohesiveLightSurface,
-    surfaceVariant = CohesiveLightSurfaceVariant,
-    onPrimary = CohesiveLightOnPrimary,
-    onSecondary = CohesiveLightBg,
-    onTertiary = CohesiveLightBg,
-    onBackground = CohesiveLightOnBackground,
-    onSurface = CohesiveLightOnSurface,
-    primaryContainer = CohesiveLightPrimaryContainer,
-    onPrimaryContainer = CohesiveLightOnPrimaryContainer,
-    outline = CohesiveLightBorder,
-    outlineVariant = CohesiveLightBorder
+    primary = BrandPrimary,
+    secondary = BrandSecondary,
+    tertiary = BrandTertiary,
+    background = BrandBackgroundLight,
+    surface = BrandSurfaceLight,
+    surfaceVariant = BrandSurfaceVariantLight,
+    onPrimary = Color.White,
+    onSecondary = Color.White,
+    onTertiary = Color.White,
+    onBackground = BrandOnBackgroundLight,
+    onSurface = BrandOnSurfaceLight,
+    onSurfaceVariant = BrandOnSurfaceVariantLight,
+    primaryContainer = BrandPrimaryContainerLight,
+    onPrimaryContainer = BrandOnPrimaryContainerLight,
+    secondaryContainer = BrandSecondaryContainerLight,
+    onSecondaryContainer = BrandOnSecondaryContainerLight,
+    outline = BrandOutlineLight,
+    outlineVariant = BrandOutlineVariantLight
 )
 
 @Composable
@@ -59,6 +69,18 @@ fun MyApplicationTheme(
         }
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
+    }
+
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as? Activity)?.window
+            if (window != null) {
+                val controller = WindowCompat.getInsetsController(window, view)
+                controller.isAppearanceLightStatusBars = !darkTheme
+                controller.isAppearanceLightNavigationBars = !darkTheme
+            }
+        }
     }
 
     MaterialTheme(

@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.DailyTask
 import com.example.data.model.DateUtils
+import com.example.data.model.VocabQuizSet
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -34,6 +35,9 @@ import java.util.*
 @Composable
 fun CalendarScreen(
     allDailyTasks: List<DailyTask>,
+    vocabQuizSets: List<VocabQuizSet>,
+    selectedDate: String,
+    onSelectDate: (String) -> Unit,
     onToggleTaskCompletion: (DailyTask) -> Unit
 ) {
     val scrollState = rememberScrollState()
@@ -42,11 +46,24 @@ fun CalendarScreen(
     var selectedYear by remember { mutableStateOf(Calendar.getInstance().get(Calendar.YEAR)) }
     var selectedMonth by remember { mutableStateOf(Calendar.getInstance().get(Calendar.MONTH)) } // 0-11
 
-    var selectedDayString by remember { mutableStateOf(DateUtils.getTodayString()) }
+    // Sync year and month with external selectedDate whenever it changes
+    LaunchedEffect(selectedDate) {
+        val cal = Calendar.getInstance()
+        DateUtils.parseDate(selectedDate)?.let {
+            cal.time = it
+            selectedYear = cal.get(Calendar.YEAR)
+            selectedMonth = cal.get(Calendar.MONTH)
+        }
+    }
 
     // Group daily tasks by date
     val tasksByDate = remember(allDailyTasks) {
         allDailyTasks.groupBy { it.date }
+    }
+
+    // Group vocab quiz sets by date
+    val quizSetsByDate = remember(vocabQuizSets) {
+        vocabQuizSets.groupBy { it.date }
     }
 
     // Days in current selected month
@@ -198,28 +215,58 @@ fun CalendarScreen(
                                 DateUtils.getFormatter().format(cal.time)
                             }
 
-                            val isSelected = selectedDayString == cellDateString
+                            val isSelected = selectedDate == cellDateString
                             val cellTasks = tasksByDate[cellDateString] ?: emptyList()
+                            val cellQuizSets = quizSetsByDate[cellDateString] ?: emptyList()
+                            val hasQuizActivity = cellQuizSets.isNotEmpty()
 
                             // Calculate cell metrics
                             val totalCount = cellTasks.size
                             val completedCount = cellTasks.count { it.isCompleted }
                             val consistencyRatio = if (totalCount == 0) 0.0 else (completedCount.toDouble() / totalCount) * 100.0
 
-                            // Styling based on consistency
+                            // Styling based on consistency ratio (heatmap style)
+                            val isDark = MaterialTheme.colorScheme.background.red < 0.5f
                             val containerColor = when {
-                                totalCount == 0 -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
-                                consistencyRatio >= 100.0 -> MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
-                                consistencyRatio >= 50.0 -> MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
-                                consistencyRatio > 0.0 -> MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                                else -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                                totalCount == 0 -> {
+                                    if (isDark) Color(0xFF1E242B) else Color(0xFFEBF0F2)
+                                }
+                                consistencyRatio == 0.0 -> {
+                                    if (isDark) Color(0xFF3F1D1D) else Color(0xFFFFECEB)
+                                }
+                                consistencyRatio <= 33.0 -> {
+                                    if (isDark) Color(0xFF073838) else Color(0xFFE0F2F1)
+                                }
+                                consistencyRatio <= 66.0 -> {
+                                    if (isDark) Color(0xFF0A5252) else Color(0xFFB2DFDB)
+                                }
+                                consistencyRatio < 100.0 -> {
+                                    if (isDark) Color(0xFF0C6B6B) else Color(0xFF4DB6AC)
+                                }
+                                else -> {
+                                    if (isDark) Color(0xFF1B3D22) else Color(0xFFA5D6A7)
+                                }
                             }
 
                             val textColor = when {
-                                totalCount == 0 -> MaterialTheme.colorScheme.onSurfaceVariant
-                                consistencyRatio >= 100.0 -> MaterialTheme.colorScheme.onPrimary
-                                consistencyRatio >= 50.0 -> MaterialTheme.colorScheme.onPrimaryContainer
-                                else -> MaterialTheme.colorScheme.onBackground
+                                totalCount == 0 -> {
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                }
+                                consistencyRatio == 0.0 -> {
+                                    if (isDark) Color(0xFFFFB4AB) else Color(0xFFBA1A1A)
+                                }
+                                consistencyRatio <= 33.0 -> {
+                                    if (isDark) Color(0xFF80CBC4) else Color(0xFF004D40)
+                                }
+                                consistencyRatio <= 66.0 -> {
+                                    if (isDark) Color(0xFFB2DFDB) else Color(0xFF004D40)
+                                }
+                                consistencyRatio < 100.0 -> {
+                                    if (isDark) Color(0xFFE0F2F1) else Color(0xFF00332C)
+                                }
+                                else -> {
+                                    if (isDark) Color(0xFF81C784) else Color(0xFF1B5E20)
+                                }
                             }
 
                             Box(
@@ -235,7 +282,7 @@ fun CalendarScreen(
                                         shape = RoundedCornerShape(12.dp)
                                     )
                                     .clickable {
-                                        selectedDayString = cellDateString
+                                        onSelectDate(cellDateString)
                                     }
                                     .testTag("calendar_cell_$dayNumber")
                             ) {
@@ -254,6 +301,15 @@ fun CalendarScreen(
                                             color = textColor.copy(alpha = 0.8f)
                                         )
                                     }
+                                    if (hasQuizActivity) {
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .size(4.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.primary)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -262,23 +318,45 @@ fun CalendarScreen(
             }
         }
 
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Quiz Indicator Legend on Calendar Screen
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "Indicates generated Quiz Set exists for date",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
         Spacer(modifier = Modifier.height(24.dp))
 
         // Selected Date Summary Checklist Drawer
-        val selectedDateReadable = remember(selectedDayString) {
+        val selectedDateReadable = remember(selectedDate) {
             try {
-                val parsed = DateUtils.parseDate(selectedDayString)
+                val parsed = DateUtils.parseDate(selectedDate)
                 if (parsed != null) {
                     SimpleDateFormat("MMMM d, yyyy (EEEE)", Locale.US).format(parsed)
                 } else {
-                    selectedDayString
+                    selectedDate
                 }
             } catch (e: Exception) {
-                selectedDayString
+                selectedDate
             }
         }
 
-        val selectedDayTasks = tasksByDate[selectedDayString] ?: emptyList()
+        val selectedDayTasks = tasksByDate[selectedDate] ?: emptyList()
 
         Card(
             shape = RoundedCornerShape(20.dp),
@@ -342,19 +420,23 @@ fun CalendarScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
+                    val isDark = MaterialTheme.colorScheme.background.red < 0.5f
+                    val greenText = if (isDark) Color(0xFF81C784) else Color(0xFF2E7D32)
+                    val greenBg = if (isDark) Color(0xFF1B3D22) else Color(0xFFE8F5E9)
+
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         selectedDayTasks.forEach { task ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
+                                    .clip(RoundedCornerShape(12.dp))
                                     .background(
-                                        if (task.isCompleted) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                                        if (task.isCompleted) greenBg
                                         else MaterialTheme.colorScheme.surface
                                     )
-                                    .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+                                    .border(0.5.dp, if (task.isCompleted) greenText.copy(alpha = 0.4f) else MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
                                     .clickable { onToggleTaskCompletion(task) }
-                                    .padding(vertical = 8.dp, horizontal = 12.dp),
+                                    .padding(vertical = 12.dp, horizontal = 16.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
@@ -362,14 +444,19 @@ fun CalendarScreen(
                                     Checkbox(
                                         checked = task.isCompleted,
                                         onCheckedChange = { onToggleTaskCompletion(task) },
+                                        colors = CheckboxDefaults.colors(
+                                            checkedColor = greenText,
+                                            uncheckedColor = MaterialTheme.colorScheme.outline,
+                                            checkmarkColor = Color.White
+                                        ),
                                         modifier = Modifier.size(24.dp).testTag("calendar_task_todo_${task.categoryName}")
                                     )
-                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Spacer(modifier = Modifier.width(12.dp))
                                     Text(
                                         text = task.categoryName,
                                         style = MaterialTheme.typography.bodyMedium,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+                                        color = if (task.isCompleted) greenText else MaterialTheme.colorScheme.onSurface
                                     )
                                 }
 
@@ -377,7 +464,7 @@ fun CalendarScreen(
                                     text = if (task.isCompleted) "PASSED" else "PENDING",
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Black,
-                                    color = if (task.isCompleted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                    color = if (task.isCompleted) greenText else MaterialTheme.colorScheme.outline
                                 )
                             }
                         }

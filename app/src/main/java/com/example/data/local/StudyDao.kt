@@ -4,6 +4,8 @@ import androidx.room.*
 import com.example.data.model.Category
 import com.example.data.model.DailyTask
 import com.example.data.model.UserStats
+import com.example.data.model.VocabQuizSet
+import com.example.data.model.VocabQuizQuestion
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -11,9 +13,6 @@ interface StudyDao {
     // Categories
     @Query("SELECT * FROM categories ORDER BY name ASC")
     fun getAllCategories(): Flow<List<Category>>
-
-    @Query("SELECT * FROM categories ORDER BY name ASC")
-    suspend fun getAllCategoriesSync(): List<Category>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCategory(category: Category)
@@ -27,9 +26,6 @@ interface StudyDao {
     // Daily Tasks
     @Query("SELECT * FROM daily_tasks ORDER BY date ASC")
     fun getAllDailyTasks(): Flow<List<DailyTask>>
-
-    @Query("SELECT * FROM daily_tasks ORDER BY date ASC")
-    suspend fun getAllDailyTasksSync(): List<DailyTask>
 
     @Query("SELECT * FROM daily_tasks WHERE date = :date")
     fun getDailyTasksForDate(date: String): Flow<List<DailyTask>>
@@ -68,4 +64,41 @@ interface StudyDao {
 
     @Query("DELETE FROM user_stats")
     suspend fun clearUserStats()
+
+    // Vocab Quizzes
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertQuizSet(quizSet: VocabQuizSet): Long
+
+    @Query("SELECT * FROM vocab_quiz_sets ORDER BY date DESC")
+    fun getAllQuizSets(): Flow<List<VocabQuizSet>>
+
+    @Query("SELECT * FROM vocab_quiz_sets WHERE date = :date LIMIT 1")
+    suspend fun getQuizSetByDate(date: String): VocabQuizSet?
+
+    @Query("SELECT * FROM vocab_quiz_sets WHERE id = :id LIMIT 1")
+    suspend fun getQuizSetById(id: Int): VocabQuizSet?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertQuizQuestions(questions: List<VocabQuizQuestion>)
+
+    @Query("SELECT * FROM vocab_quiz_questions WHERE quizSetId = :quizSetId ORDER BY id ASC")
+    fun getQuestionsForQuizSet(quizSetId: Int): Flow<List<VocabQuizQuestion>>
+
+    @Query("SELECT * FROM vocab_quiz_questions WHERE quizSetId = :quizSetId ORDER BY id ASC")
+    suspend fun getQuestionsForQuizSetSync(quizSetId: Int): List<VocabQuizQuestion>
+
+    @Update
+    suspend fun updateQuizQuestion(question: VocabQuizQuestion)
+
+    @Delete
+    suspend fun deleteQuizSet(quizSet: VocabQuizSet)
+
+    @Query("DELETE FROM vocab_quiz_questions WHERE quizSetId = :quizSetId")
+    suspend fun deleteQuestionsForQuizSet(quizSetId: Int)
+
+    @Query("DELETE FROM vocab_quiz_sets")
+    suspend fun clearVocabQuizSets()
+
+    @Query("DELETE FROM vocab_quiz_questions")
+    suspend fun clearVocabQuizQuestions()
 }

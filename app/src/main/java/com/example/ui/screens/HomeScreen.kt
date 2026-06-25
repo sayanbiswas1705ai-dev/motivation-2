@@ -1,6 +1,5 @@
 package com.example.ui.screens
 
-import android.net.Uri
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -28,12 +27,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
 import com.example.data.model.Category
 import com.example.data.model.DailyTask
 import com.example.data.model.UserStats
 import com.example.data.model.DateUtils
+import com.example.data.model.VocabQuizSet
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -44,6 +42,8 @@ fun HomeScreen(
     categories: List<Category>,
     selectedDate: String,
     dailyTasks: List<DailyTask>,
+    allDailyTasks: List<DailyTask>,
+    vocabQuizSets: List<VocabQuizSet>,
     selectedConsistencyRatio: Double,
     overallConsistencyRatio: Double,
     onSelectDate: (String) -> Unit,
@@ -86,73 +86,18 @@ fun HomeScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Profile Picture (Uploadable)
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer)
-                        .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                        .testTag("user_profile_picture_container")
-                ) {
-                    if (stats?.profilePictureUri != null && stats.profilePictureUri.isNotBlank()) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(context)
-                                .data(Uri.parse(stats.profilePictureUri))
-                                .crossfade(true)
-                                .build(),
-                            contentDescription = "User profile picture",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
-                    } else {
-                        // Initials or placeholder character icon
-                        val initialChar = if (!stats?.userName.isNullOrBlank()) {
-                            stats!!.userName.first().uppercase()
-                        } else {
-                            "P"
-                        }
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = initialChar,
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
-                    }
-                }
-
-                // Greeting & Name
-                Column {
-                    val displayName = if (!stats?.userName.isNullOrBlank()) stats.userName else "Aspirant"
-                    Text(
-                        text = "Hello, $displayName!",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    if (!stats?.userDob.isNullOrBlank()) {
-                        Text(
-                            text = "DoB: ${stats.userDob}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    } else {
-                        Text(
-                            text = "No DoB set",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                        )
-                    }
-                }
+            Column {
+                Text(
+                    text = "Sayan's Initiative",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "Exam Preparation Tracker",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                )
             }
 
             // Settings Action Icon
@@ -268,6 +213,15 @@ fun HomeScreen(
                 DatePicker(state = datePickerState)
             }
         }
+
+        // Compact monthly heatmap calendar
+        CompactMonthlyCalendar(
+            selectedDate = selectedDate,
+            allDailyTasks = allDailyTasks,
+            vocabQuizSets = vocabQuizSets,
+            onSelectDate = onSelectDate,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+        )
 
         // Prominent Progress & Consistency Metric Card
         Card(
@@ -507,24 +461,21 @@ fun HomeScreen(
                     .testTag("home_checklist_items"),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                val isDark = MaterialTheme.colorScheme.background.red < 0.5f
+                val greenText = if (isDark) Color(0xFF81C784) else Color(0xFF2E7D32)
+                val greenBg = if (isDark) Color(0xFF1B3D22) else Color(0xFFE8F5E9)
+
                 dailyTasks.forEach { task ->
                     Card(
                         shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = if (task.isCompleted) {
-                                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)
-                            } else {
-                                MaterialTheme.colorScheme.surface
-                            }
+                            containerColor = if (task.isCompleted) greenBg else MaterialTheme.colorScheme.surface
                         ),
                         border = BorderStroke(
                             width = 1.dp,
-                            color = if (task.isCompleted) {
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                            } else {
-                                MaterialTheme.colorScheme.outlineVariant
-                            }
+                            color = if (task.isCompleted) greenText.copy(alpha = 0.4f) else MaterialTheme.colorScheme.outlineVariant
                         ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = if (task.isCompleted) 1.dp else 3.dp),
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { onToggleTaskCompletion(task) }
@@ -533,7 +484,7 @@ fun HomeScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
@@ -544,6 +495,11 @@ fun HomeScreen(
                                 Checkbox(
                                     checked = task.isCompleted,
                                     onCheckedChange = { onToggleTaskCompletion(task) },
+                                    colors = CheckboxDefaults.colors(
+                                        checkedColor = greenText,
+                                        uncheckedColor = MaterialTheme.colorScheme.outline,
+                                        checkmarkColor = Color.White
+                                    ),
                                     modifier = Modifier.testTag("daily_task_checkbox_${task.categoryName.replace(" ", "_")}")
                                 )
                                 Spacer(modifier = Modifier.width(12.dp))
@@ -551,32 +507,20 @@ fun HomeScreen(
                                     text = task.categoryName,
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (task.isCompleted) {
-                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurface
-                                    }
+                                    color = if (task.isCompleted) greenText else MaterialTheme.colorScheme.onSurface
                                 )
                             }
 
                             // Completion Status Pill
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
-                                color = if (task.isCompleted) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.surfaceVariant
-                                }
+                                color = if (task.isCompleted) greenText.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant
                             ) {
                                 Text(
                                     text = if (task.isCompleted) "PASSED" else "PENDING",
                                     fontWeight = FontWeight.Bold,
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = if (task.isCompleted) {
-                                        MaterialTheme.colorScheme.onPrimary
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
+                                    color = if (task.isCompleted) greenText else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
                             }
@@ -587,5 +531,333 @@ fun HomeScreen(
         }
         
         Spacer(modifier = Modifier.height(100.dp))
+    }
+}
+
+@Composable
+fun CompactMonthlyCalendar(
+    selectedDate: String,
+    allDailyTasks: List<DailyTask>,
+    vocabQuizSets: List<VocabQuizSet>,
+    onSelectDate: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var currentYear by remember { mutableStateOf(Calendar.getInstance().get(Calendar.YEAR)) }
+    var currentMonth by remember { mutableStateOf(Calendar.getInstance().get(Calendar.MONTH)) } // 0-11
+
+    // Synchronize current calendar view month/year with the selected date whenever it changes
+    LaunchedEffect(selectedDate) {
+        val cal = Calendar.getInstance()
+        DateUtils.parseDate(selectedDate)?.let {
+            cal.time = it
+            currentYear = cal.get(Calendar.YEAR)
+            currentMonth = cal.get(Calendar.MONTH)
+        }
+    }
+
+    val tasksByDate = remember(allDailyTasks) {
+        allDailyTasks.groupBy { it.date }
+    }
+
+    val quizSetsByDate = remember(vocabQuizSets) {
+        vocabQuizSets.groupBy { it.date }
+    }
+
+    val calendarInstance = remember(currentMonth, currentYear) {
+        Calendar.getInstance().apply {
+            set(Calendar.YEAR, currentYear)
+            set(Calendar.MONTH, currentMonth)
+            set(Calendar.DAY_OF_MONTH, 1)
+        }
+    }
+
+    val daysInMonth = calendarInstance.getActualMaximum(Calendar.DAY_OF_MONTH)
+    val dayOfWeekOffset = calendarInstance.get(Calendar.DAY_OF_WEEK) - 1
+
+    val monthName = remember(currentMonth, currentYear) {
+        val cal = Calendar.getInstance().apply {
+            set(Calendar.MONTH, currentMonth)
+            set(Calendar.YEAR, currentYear)
+        }
+        SimpleDateFormat("MMMM yyyy", Locale.US).format(cal.time)
+    }
+
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("home_calendar_card")
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            // Month Header Selector Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = {
+                        if (currentMonth == 0) {
+                            currentMonth = 11
+                            currentYear -= 1
+                        } else {
+                            currentMonth -= 1
+                        }
+                    },
+                    modifier = Modifier.size(36.dp).testTag("home_prev_month")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ChevronLeft,
+                        contentDescription = "Previous Month",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                Text(
+                    text = monthName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                IconButton(
+                    onClick = {
+                        if (currentMonth == 11) {
+                            currentMonth = 0
+                            currentYear += 1
+                        } else {
+                            currentMonth += 1
+                        }
+                    },
+                    modifier = Modifier.size(36.dp).testTag("home_next_month")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = "Next Month",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Weekdays Row (S, M, T, W, T, F, S)
+            val weekdays = listOf("S", "M", "T", "W", "T", "F", "S")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceAround
+            ) {
+                weekdays.forEach { dayLetter ->
+                    Text(
+                        text = dayLetter,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Grid Layout of Cells
+            val totalCells = daysInMonth + dayOfWeekOffset
+            val rowsCount = (totalCells + 6) / 7
+
+            Column(
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                for (r in 0 until rowsCount) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        for (c in 0..6) {
+                            val cellIndex = r * 7 + c
+                            val dayNumber = cellIndex - dayOfWeekOffset + 1
+
+                            if (cellIndex < dayOfWeekOffset || dayNumber > daysInMonth) {
+                                Box(modifier = Modifier.weight(1f))
+                            } else {
+                                val cellDateString = remember(dayNumber, currentMonth, currentYear) {
+                                    val cal = Calendar.getInstance().apply {
+                                        set(Calendar.YEAR, currentYear)
+                                        set(Calendar.MONTH, currentMonth)
+                                        set(Calendar.DAY_OF_MONTH, dayNumber)
+                                    }
+                                    DateUtils.getFormatter().format(cal.time)
+                                }
+
+                                val isSelected = selectedDate == cellDateString
+                                val cellTasks = tasksByDate[cellDateString] ?: emptyList()
+                                val cellQuizSets = quizSetsByDate[cellDateString] ?: emptyList()
+
+                                val totalCount = cellTasks.size
+                                val completedCount = cellTasks.count { it.isCompleted }
+                                val consistencyRatio = if (totalCount == 0) 0.0 else (completedCount.toDouble() / totalCount) * 100.0
+                                val hasQuizActivity = cellQuizSets.isNotEmpty()
+
+                                // Determine background color & text color
+                                val isDark = MaterialTheme.colorScheme.background.red < 0.5f
+                                
+                                val containerColor = when {
+                                    totalCount == 0 -> {
+                                        if (isDark) Color(0xFF1E242B) else Color(0xFFF0F4F8)
+                                    }
+                                    consistencyRatio == 0.0 -> {
+                                        if (isDark) Color(0xFF4C1D1D) else Color(0xFFFFEBEE)
+                                    }
+                                    consistencyRatio <= 33.0 -> {
+                                        if (isDark) Color(0xFF073C3C) else Color(0xFFE0F2F1)
+                                    }
+                                    consistencyRatio <= 66.0 -> {
+                                        if (isDark) Color(0xFF0D5E59) else Color(0xFF80CBC4)
+                                    }
+                                    consistencyRatio < 100.0 -> {
+                                        if (isDark) Color(0xFF1B827A) else Color(0xFF26A69A)
+                                    }
+                                    else -> {
+                                        if (isDark) Color(0xFF1B4D22) else Color(0xFFA5D6A7)
+                                    }
+                                }
+
+                                val textColor = when {
+                                    totalCount == 0 -> {
+                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                                    }
+                                    consistencyRatio == 0.0 -> {
+                                        if (isDark) Color(0xFFFF8A80) else Color(0xFFC62828)
+                                    }
+                                    consistencyRatio <= 33.0 -> {
+                                        if (isDark) Color(0xFF80CBC4) else Color(0xFF004D40)
+                                    }
+                                    consistencyRatio <= 66.0 -> {
+                                        if (isDark) Color(0xFFE0F2F1) else Color(0xFF004D40)
+                                    }
+                                    consistencyRatio < 100.0 -> {
+                                        if (isDark) Color.White else Color(0xFF00332C)
+                                    }
+                                    else -> {
+                                        if (isDark) Color(0xFFC8E6C9) else Color(0xFF1B5E20)
+                                    }
+                                }
+
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .aspectRatio(1f)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(containerColor)
+                                        .border(
+                                            width = if (isSelected) 2.dp else 0.5.dp,
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                                            shape = RoundedCornerShape(10.dp)
+                                        )
+                                        .clickable {
+                                            onSelectDate(cellDateString)
+                                        }
+                                        .testTag("home_calendar_cell_$dayNumber")
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center,
+                                        modifier = Modifier.fillMaxSize()
+                                    ) {
+                                        Text(
+                                            text = "$dayNumber",
+                                            fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = textColor,
+                                            fontSize = 13.sp
+                                        )
+                                        
+                                        // Quiz Activity Indicator Dot
+                                        if (hasQuizActivity) {
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(4.dp)
+                                                    .clip(CircleShape)
+                                                    .background(MaterialTheme.colorScheme.primary)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Calendar Heatmap Legend
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Less",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+
+                // Color tiles of legend
+                val isDark = MaterialTheme.colorScheme.background.red < 0.5f
+                val legendColors = listOf(
+                    if (isDark) Color(0xFF1E242B) else Color(0xFFF0F4F8),
+                    if (isDark) Color(0xFF4C1D1D) else Color(0xFFFFEBEE),
+                    if (isDark) Color(0xFF073C3C) else Color(0xFFE0F2F1),
+                    if (isDark) Color(0xFF0D5E59) else Color(0xFF80CBC4),
+                    if (isDark) Color(0xFF1B827A) else Color(0xFF26A69A),
+                    if (isDark) Color(0xFF1B4D22) else Color(0xFFA5D6A7)
+                )
+
+                legendColors.forEach { color ->
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(color)
+                            .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(2.dp))
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+
+                Spacer(modifier = Modifier.width(2.dp))
+                Text(
+                    text = "More",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+                
+                Spacer(modifier = Modifier.width(12.dp))
+                
+                // Quiz indicator legend
+                Box(
+                    modifier = Modifier
+                        .size(4.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "Quiz Set",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
+        }
     }
 }

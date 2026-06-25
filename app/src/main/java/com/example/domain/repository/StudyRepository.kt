@@ -3,6 +3,8 @@ package com.example.domain.repository
 import com.example.data.model.Category
 import com.example.data.model.DailyTask
 import com.example.data.model.UserStats
+import com.example.data.model.VocabQuizSet
+import com.example.data.model.VocabQuizQuestion
 import kotlinx.coroutines.flow.Flow
 
 interface StudyRepository {
@@ -20,15 +22,15 @@ interface StudyRepository {
 
     fun getUserStats(): Flow<UserStats?>
     suspend fun saveUserStats(stats: UserStats)
-    suspend fun getUserStatsSync(): UserStats?
-    suspend fun getAllCategoriesSync(): List<Category>
-    suspend fun getAllDailyTasksSync(): List<DailyTask>
-    suspend fun restoreCloudData(
-        userName: String,
-        userDob: String,
-        profilePictureUri: String?,
-        categories: List<String>,
-        dailyTasks: List<DailyTask>
-    )
     suspend fun resetProgress()
+
+    // Vocab Quizzes
+    fun getAllQuizSets(): Flow<List<VocabQuizSet>>
+    suspend fun getQuizSetByDate(date: String): VocabQuizSet?
+    suspend fun getQuizSetById(id: Int): VocabQuizSet?
+    suspend fun createQuizSet(quizSet: VocabQuizSet, questions: List<VocabQuizQuestion>)
+    fun getQuestionsForQuizSet(quizSetId: Int): Flow<List<VocabQuizQuestion>>
+    suspend fun updateQuizQuestion(question: VocabQuizQuestion)
+    suspend fun resetQuizSet(quizSetId: Int)
+    suspend fun deleteQuizSet(quizSet: VocabQuizSet)
 }

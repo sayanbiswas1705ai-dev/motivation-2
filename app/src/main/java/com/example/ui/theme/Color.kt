@@ -2,59 +2,97 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// --- COHESIVE MATERIAL 3 STYLING (Royal Violet & Jade Green Theme) ---
+// --- PREMIUM BLUE/TEAL STUDY THEME ---
 
-// Sophisticated Dark Color Palette
-val SophisticatedBg = Color(0xFF121318)
-val SophisticatedSurface = Color(0xFF1E1F24)
-val SophisticatedSurfaceVariant = Color(0xFF2B2D35)
-val SophisticatedPrimary = Color(0xFFD0BCFF)
-val SophisticatedOnPrimary = Color(0xFF381E72)
-val SophisticatedSecondary = Color(0xFF34D399) // Mint/teal success color
-val SophisticatedTertiary = Color(0xFFFBBF24)  // Gold Star/Awards color
-val SophisticatedOnBackground = Color(0xFFE2E2E6)
-val SophisticatedOnSurface = Color(0xFFE2E2E6)
-val SophisticatedSubtext = Color(0xFF909094)
-val SophisticatedBorder = Color(0xFF44474E)
-val SophisticatedPrimaryContainer = Color(0xFF3F4759)
-val SophisticatedOnPrimaryContainer = Color(0xFFD1E4FF)
+// Core Palette
+val BrandPrimary = Color(0xFF0F6E6E) // Deep Teal
+val BrandSecondary = Color(0xFF14708A) // Complementary Lighter Teal/Blue
+val BrandTertiary = Color(0xFFE07A5F) // Warm Accent (Coral/Terracotta)
 
-// Sophisticated Light Color Palette
-val CohesiveLightBg = Color(0xFFFAF9F6)
-val CohesiveLightSurface = Color(0xFFFFFFFF)
-val CohesiveLightSurfaceVariant = Color(0xFFEAEAEA)
-val CohesiveLightPrimary = Color(0xFF65558F)
+// Light Theme Colors
+val BrandBackgroundLight = Color(0xFFF7F9FA) // Soft off-white
+val BrandSurfaceLight = Color(0xFFFFFFFF) // Clean White Card
+val BrandSurfaceVariantLight = Color(0xFFEEF2F3)
+val BrandOnBackgroundLight = Color(0xFF1A1C1E)
+val BrandOnSurfaceLight = Color(0xFF1A1C1E)
+val BrandOnSurfaceVariantLight = Color(0xFF41474D)
+val BrandOutlineLight = Color(0xFF71787E)
+val BrandOutlineVariantLight = Color(0xFFC1C7CE)
+val BrandPrimaryContainerLight = Color(0xFFD2EBF0)
+val BrandOnPrimaryContainerLight = Color(0xFF001F24)
+val BrandSecondaryContainerLight = Color(0xFFE2F3F5)
+val BrandOnSecondaryContainerLight = Color(0xFF002022)
+
+// Dark Theme Colors
+val BrandBackgroundDark = Color(0xFF11161B) // Deep Navy Charcoal
+val BrandSurfaceDark = Color(0xFF191F26) // Navy Card Surface
+val BrandSurfaceVariantDark = Color(0xFF282F37)
+val BrandOnBackgroundDark = Color(0xFFE1E2E5)
+val BrandOnSurfaceDark = Color(0xFFE1E2E5)
+val BrandOnSurfaceVariantDark = Color(0xFFC1C7CE)
+val BrandOutlineDark = Color(0xFF8B9198)
+val BrandOutlineVariantDark = Color(0xFF41474D)
+val BrandPrimaryDark = Color(0xFF84D2D2) // Lighter Teal
+val BrandSecondaryDark = Color(0xFF94D2E6) // Lighter Blue
+val BrandTertiaryDark = Color(0xFFFFB49A) // Warm Accent
+val BrandPrimaryContainerDark = Color(0xFF004F50)
+val BrandOnPrimaryContainerDark = Color(0xFF9CF3F3)
+
+// Success & Highlight States
+val SuccessGreen = Color(0xFF2E7D32) // Confident clean green
+val SuccessContainerGreen = Color(0xFFE8F5E9)
+
+// Compatibility fallbacks and Legacy helpers (to avoid breaking any code)
+val CohesiveLightPrimary = BrandPrimary
+val CohesiveLightSecondary = BrandSecondary
+val CohesiveLightTertiary = BrandTertiary
+val CohesiveLightBg = BrandBackgroundLight
+val CohesiveLightSurface = BrandSurfaceLight
+val CohesiveLightSurfaceVariant = BrandSurfaceVariantLight
 val CohesiveLightOnPrimary = Color(0xFFFFFFFF)
-val CohesiveLightSecondary = Color(0xFF006C4C)
-val CohesiveLightTertiary = Color(0xFF7D5200)
-val CohesiveLightOnBackground = Color(0xFF1C1B1F)
-val CohesiveLightOnSurface = Color(0xFF1C1B1F)
-val CohesiveLightSubtext = Color(0xFF79747E)
-val CohesiveLightBorder = Color(0xFFCAC4D0)
-val CohesiveLightPrimaryContainer = Color(0xFFEADDFF)
-val CohesiveLightOnPrimaryContainer = Color(0xFF21005D)
+val CohesiveLightOnBackground = BrandOnBackgroundLight
+val CohesiveLightOnSurface = BrandOnSurfaceLight
+val CohesiveLightSubtext = BrandOnSurfaceVariantLight
+val CohesiveLightBorder = BrandOutlineLight
+val BrandPrimaryContainer = BrandPrimaryContainerLight
+val CohesiveLightPrimaryContainer = BrandPrimaryContainerLight
+val CohesiveLightOnPrimaryContainer = BrandOnPrimaryContainerLight
 
-// Compatibility fallbacks and Legacy helpers
-val LightPrimary = CohesiveLightPrimary
-val LightSecondary = CohesiveLightSecondary
-val LightTertiary = CohesiveLightTertiary
-val LightBackground = CohesiveLightBg
-val LightSurface = CohesiveLightSurface
-val LightOnBackground = CohesiveLightOnBackground
-val LightOnSurface = CohesiveLightOnSurface
+val SophisticatedPrimary = BrandPrimaryDark
+val SophisticatedSecondary = BrandSecondaryDark
+val SophisticatedTertiary = BrandTertiaryDark
+val SophisticatedBg = BrandBackgroundDark
+val SophisticatedSurface = BrandSurfaceDark
+val SophisticatedSurfaceVariant = BrandSurfaceVariantDark
+val SophisticatedOnPrimary = Color(0xFF11161B)
+val SophisticatedOnBackground = BrandOnBackgroundDark
+val SophisticatedOnSurface = BrandOnSurfaceDark
+val SophisticatedSubtext = BrandOnSurfaceVariantDark
+val SophisticatedBorder = BrandOutlineDark
+val SophisticatedPrimaryContainer = BrandPrimaryContainerDark
+val SophisticatedOnPrimaryContainer = BrandOnPrimaryContainerDark
 
-val DarkPrimary = SophisticatedPrimary
-val DarkSecondary = SophisticatedSecondary
-val DarkTertiary = SophisticatedTertiary
-val DarkBackground = SophisticatedBg
-val DarkSurface = SophisticatedSurface
-val DarkOnBackground = SophisticatedOnBackground
-val DarkOnSurface = SophisticatedOnSurface
+val LightPrimary = BrandPrimary
+val LightSecondary = BrandSecondary
+val LightTertiary = BrandTertiary
+val LightBackground = BrandBackgroundLight
+val LightSurface = BrandSurfaceLight
+val LightOnBackground = BrandOnBackgroundLight
+val LightOnSurface = BrandOnSurfaceLight
 
-val SlateGray = SophisticatedSubtext
+val DarkPrimary = BrandPrimaryDark
+val DarkSecondary = BrandSecondaryDark
+val DarkTertiary = BrandTertiaryDark
+val DarkBackground = BrandBackgroundDark
+val DarkSurface = BrandSurfaceDark
+val DarkOnBackground = BrandOnBackgroundDark
+val DarkOnSurface = BrandOnSurfaceDark
+
+val SlateGray = BrandOnSurfaceVariantLight
 val LightSlateGray = Color(0xFFBAC3D4)
-val GreenCheck = Color(0xFF34D399)
+val GreenCheck = SuccessGreen
 val GoldStar = Color(0xFFFBBF24)
 val CrimsonBookmark = Color(0xFFEF4444)
 val LockedGray = Color(0xFF475569)
 val UnlockedBlue = Color(0xFF38BDF8)
+

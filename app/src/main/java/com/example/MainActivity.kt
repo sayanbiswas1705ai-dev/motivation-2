@@ -15,9 +15,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.material.icons.filled.Book
 import com.example.ui.screens.CalendarScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.SettingsScreen
+import com.example.ui.screens.VocabQuizScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.StudyViewModel
 
@@ -41,11 +43,8 @@ class MainActivity : ComponentActivity() {
                 val dailyTasksForSelectedDate by viewModel.dailyTasksForSelectedDate.collectAsStateWithLifecycle()
                 val selectedConsistencyRatio by viewModel.selectedDateConsistencyRatio.collectAsStateWithLifecycle()
                 val overallConsistencyRatio by viewModel.overallConsistencyRatio.collectAsStateWithLifecycle()
+                val vocabQuizSets by viewModel.vocabQuizSets.collectAsStateWithLifecycle()
                 
-                val cloudSyncId by viewModel.cloudSyncId.collectAsStateWithLifecycle()
-                val cloudSyncLastTime by viewModel.cloudSyncLastTime.collectAsStateWithLifecycle()
-                val cloudSyncStatus by viewModel.cloudSyncStatus.collectAsStateWithLifecycle()
-
                 var currentTab by remember { mutableStateOf(0) }
                 var showSettings by remember { mutableStateOf(false) }
 
@@ -55,7 +54,6 @@ class MainActivity : ComponentActivity() {
                 ) {
                     if (showSettings) {
                         SettingsScreen(
-                            stats = stats,
                             categories = categories,
                             isDarkTheme = isDarkTheme,
                             onToggleDarkTheme = { enabled ->
@@ -67,30 +65,11 @@ class MainActivity : ComponentActivity() {
                             onDeleteCategory = { category ->
                                 viewModel.deleteCategory(category)
                             },
-                            onUpdateProfile = { name, dob, picUri ->
-                                viewModel.updateUserProfile(name, dob, picUri)
-                            },
                             onResetData = {
                                 viewModel.forceReset()
                             },
                             onBack = {
-                                viewModel.resetSyncStatus()
                                 showSettings = false
-                            },
-                            cloudSyncId = cloudSyncId,
-                            cloudSyncLastTime = cloudSyncLastTime,
-                            cloudSyncStatus = cloudSyncStatus,
-                            onManualBackup = {
-                                viewModel.manualCloudBackup()
-                            },
-                            onManualRestore = { targetId ->
-                                viewModel.manualCloudRestore(targetId)
-                            },
-                            onUpdateSyncId = { newId ->
-                                viewModel.updateSyncUserId(newId)
-                            },
-                            onResetSyncStatus = {
-                                viewModel.resetSyncStatus()
                             }
                         )
                     } else {
@@ -129,6 +108,18 @@ class MainActivity : ComponentActivity() {
                                         label = { Text("Calendar", style = MaterialTheme.typography.labelSmall) },
                                         modifier = Modifier.testTag("nav_calendar_tab")
                                     )
+                                    NavigationBarItem(
+                                        selected = currentTab == 2,
+                                        onClick = { currentTab = 2 },
+                                        icon = {
+                                            Icon(
+                                                imageVector = Icons.Default.Book,
+                                                contentDescription = "Vocab Quiz tab icon"
+                                            )
+                                        },
+                                        label = { Text("Vocab Quiz", style = MaterialTheme.typography.labelSmall) },
+                                        modifier = Modifier.testTag("nav_vocab_quiz_tab")
+                                    )
                                 }
                             },
                             contentWindowInsets = WindowInsets.statusBars
@@ -144,6 +135,8 @@ class MainActivity : ComponentActivity() {
                                         categories = categories,
                                         selectedDate = selectedDate,
                                         dailyTasks = dailyTasksForSelectedDate,
+                                        allDailyTasks = allDailyTasks,
+                                        vocabQuizSets = vocabQuizSets,
                                         selectedConsistencyRatio = selectedConsistencyRatio,
                                         overallConsistencyRatio = overallConsistencyRatio,
                                         onSelectDate = { dateStr ->
@@ -161,9 +154,17 @@ class MainActivity : ComponentActivity() {
                                     )
                                     1 -> CalendarScreen(
                                         allDailyTasks = allDailyTasks,
+                                        vocabQuizSets = vocabQuizSets,
+                                        selectedDate = selectedDate,
+                                        onSelectDate = { dateStr ->
+                                            viewModel.selectDate(dateStr)
+                                        },
                                         onToggleTaskCompletion = { task ->
                                             viewModel.toggleDailyTaskCompletion(task)
                                         }
+                                    )
+                                    2 -> VocabQuizScreen(
+                                        viewModel = viewModel
                                     )
                                 }
                             }

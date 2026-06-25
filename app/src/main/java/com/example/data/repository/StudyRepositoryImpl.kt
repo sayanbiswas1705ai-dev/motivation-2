@@ -5,6 +5,8 @@ import com.example.data.local.StudyDao
 import com.example.data.model.Category
 import com.example.data.model.DailyTask
 import com.example.data.model.UserStats
+import com.example.data.model.VocabQuizSet
+import com.example.data.model.VocabQuizQuestion
 import com.example.domain.repository.StudyRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.onStart
@@ -63,50 +65,6 @@ class StudyRepositoryImpl(private val studyDao: StudyDao) : StudyRepository {
         studyDao.insertUserStats(stats)
     }
 
-    override suspend fun getUserStatsSync(): UserStats? {
-        return studyDao.getUserStatsSync()
-    }
-
-    override suspend fun getAllCategoriesSync(): List<Category> {
-        return studyDao.getAllCategoriesSync()
-    }
-
-    override suspend fun getAllDailyTasksSync(): List<DailyTask> {
-        return studyDao.getAllDailyTasksSync()
-    }
-
-    override suspend fun restoreCloudData(
-        userName: String,
-        userDob: String,
-        profilePictureUri: String?,
-        categories: List<String>,
-        dailyTasks: List<DailyTask>
-    ) {
-        // Clear existing tables
-        studyDao.clearCategories()
-        studyDao.clearDailyTasks()
-        studyDao.clearUserStats()
-
-        // Insert restored categories
-        val restoredCategories = categories.map { Category(name = it) }
-        studyDao.insertCategories(restoredCategories)
-
-        // Insert restored tasks
-        for (task in dailyTasks) {
-            studyDao.insertDailyTask(task)
-        }
-
-        // Insert restored user profile stats
-        studyDao.insertUserStats(
-            UserStats(
-                id = 1,
-                userName = userName,
-                userDob = userDob,
-                profilePictureUri = profilePictureUri
-            )
-        )
-    }
-
     private suspend fun ensureUserStatsInitialized() {
         val stats = studyDao.getUserStatsSync()
         if (stats == null) {
@@ -130,6 +88,8 @@ class StudyRepositoryImpl(private val studyDao: StudyDao) : StudyRepository {
         studyDao.clearCategories()
         studyDao.clearDailyTasks()
         studyDao.clearUserStats()
+        studyDao.clearVocabQuizSets()
+        studyDao.clearVocabQuizQuestions()
 
         // Re-inject defaults
         val defaults = DatabaseInitializer.generateDefaultCategories()
@@ -142,5 +102,48 @@ class StudyRepositoryImpl(private val studyDao: StudyDao) : StudyRepository {
                 profilePictureUri = null
             )
         )
+    }
+
+    override fun getAllQuizSets(): Flow<List<VocabQuizSet>> {
+        return studyDao.getAllQuizSets()
+    }
+
+    override suspend fun getQuizSetByDate(date: String): VocabQuizSet? {
+        return studyDao.getQuizSetByDate(date)
+    }
+
+    override suspend fun getQuizSetById(id: Int): VocabQuizSet? {
+        return studyDao.getQuizSetById(id)
+    }
+
+    override suspend fun createQuizSet(quizSet: VocabQuizSet, questions: List<VocabQuizQuestion>) {
+        val quizSetId = studyDao.insertQuizSet(quizSet).toInt()
+        val questionsWithId = questions.map { it.copy(quizSetId = quizSetId) }
+        studyDao.insertQuizQuestions(questionsWithId)
+    }
+
+    override fun getQuestionsForQuizSet(quizSetId: Int): Flow<List<VocabQuizQuestion>> {
+        return studyDao.getQuestionsForQuizSet(quizSetId)
+    }
+
+    override suspend fun updateQuizQuestion(question: VocabQuizQuestion) {
+        studyDao.updateQuizQuestion(question)
+    }
+
+    override suspend fun resetQuizSet(quizSetId: Int) {
+        val questions = studyDao.getQuestionsForQuizSetSync(quizSetId)
+        val resetQuestions = questions.map {
+            it.copy(
+                userSelectedOptionIndex = -1,
+                isAnswered = false,
+                isAnsweredCorrectly = false
+            )
+        }
+        studyDao.insertQuizQuestions(resetQuestions)
+    }
+
+    override suspend fun deleteQuizSet(quizSet: VocabQuizSet) {
+        studyDao.deleteQuizSet(quizSet)
+        studyDao.deleteQuestionsForQuizSet(quizSet.id)
     }
 }

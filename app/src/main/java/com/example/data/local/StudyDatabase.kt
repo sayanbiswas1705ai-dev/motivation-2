@@ -7,8 +7,10 @@ import androidx.room.RoomDatabase
 import com.example.data.model.Category
 import com.example.data.model.DailyTask
 import com.example.data.model.UserStats
+import com.example.data.model.VocabQuizSet
+import com.example.data.model.VocabQuizQuestion
 
-@Database(entities = [Category::class, DailyTask::class, UserStats::class], version = 6, exportSchema = false)
+@Database(entities = [Category::class, DailyTask::class, UserStats::class, VocabQuizSet::class, VocabQuizQuestion::class], version = 7, exportSchema = false)
 abstract class StudyDatabase : RoomDatabase() {
     abstract fun studyDao(): StudyDao
 
