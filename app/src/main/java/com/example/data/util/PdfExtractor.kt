@@ -86,12 +86,51 @@ object PdfExtractor {
         } ?: throw Exception("Could not open input stream for PDF")
     }
 
+    private fun findTelegramAttachedDocumentUrl(html: String): String? {
+        val docWrapRegex = """class="[^"]*tgme_widget_message_document_wrap[^"]*"[^>]*href="([^"]+)"""".toRegex()
+        docWrapRegex.find(html)?.let { return it.groupValues[1] }
+
+        val hrefFirstRegex = """href="([^"]+)"[^>]*class="[^"]*tgme_widget_message_document_wrap[^"]*"""".toRegex()
+        hrefFirstRegex.find(html)?.let { return it.groupValues[1] }
+
+        val genericPdfLinkRegex = """href="([^"]+\.pdf[^"]*)"""".toRegex(RegexOption.IGNORE_CASE)
+        genericPdfLinkRegex.find(html)?.let { return it.groupValues[1] }
+
+        return null
+    }
+
+    private fun downloadPdfBodyAndExtract(
+        context: Context,
+        body: okhttp3.ResponseBody,
+        fileName: String,
+        startPage: Int?,
+        endPage: Int?
+    ): Pair<String, String> {
+        val tempFile = File(context.cacheDir, "temp_downloaded_${System.currentTimeMillis()}.pdf")
+        tempFile.outputStream().use { fos ->
+            body.byteStream().copyTo(fos)
+        }
+        return try {
+            init(context)
+            val document = PDDocument.load(tempFile)
+            val stripper = PDFTextStripper()
+            if (startPage != null) stripper.startPage = startPage
+            if (endPage != null) stripper.endPage = endPage
+            val text = stripper.getText(document)
+            document.close()
+            Pair(text ?: "", fileName)
+        } finally {
+            tempFile.delete()
+        }
+    }
+
     suspend fun downloadAndExtract(
         context: Context,
         urlString: String,
         startPage: Int? = null,
         endPage: Int? = null
     ): Pair<String, String> = withContext(Dispatchers.IO) {
+        val isTelegramPostLink = urlString.contains("t.me/")
         val client = OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
@@ -137,22 +176,7 @@ object PdfExtractor {
                 if (!fileName.lowercase().endsWith(".pdf")) {
                     fileName += ".pdf"
                 }
-                val tempFile = File(context.cacheDir, "temp_downloaded_${System.currentTimeMillis()}.pdf")
-                tempFile.outputStream().use { fos ->
-                    body.byteStream().copyTo(fos)
-                }
-                try {
-                    init(context)
-                    val document = PDDocument.load(tempFile)
-                    val stripper = PDFTextStripper()
-                    if (startPage != null) stripper.startPage = startPage
-                    if (endPage != null) stripper.endPage = endPage
-                    val text = stripper.getText(document)
-                    document.close()
-                    Pair(text ?: "", fileName)
-                } finally {
-                    tempFile.delete()
-                }
+                downloadPdfBodyAndExtract(context, body, fileName, startPage, endPage)
             }
             // TXT
             contentType.contains("text/plain") || lowercaseName.endsWith(".txt") -> {
@@ -163,10 +187,35 @@ object PdfExtractor {
                 Pair(text, fileName)
             }
             // HTML / Telegram
-            contentType.contains("text/html") || lowercaseName.endsWith(".html") || lowercaseName.endsWith(".htm") || urlString.contains("t.me/") -> {
+            contentType.contains("text/html") || lowercaseName.endsWith(".html") || lowercaseName.endsWith(".htm") || isTelegramPostLink -> {
                 val htmlContent = body.string()
+
+                if (isTelegramPostLink) {
+                    val attachedDocUrl = findTelegramAttachedDocumentUrl(htmlContent)
+                    if (attachedDocUrl != null) {
+                        val docLowercase = attachedDocUrl.lowercase()
+                        if (docLowercase.endsWith(".pdf") || docLowercase.contains(".pdf?")) {
+                            val docRequest = Request.Builder()
+                                .url(attachedDocUrl)
+                                .header("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36")
+                                .build()
+                            val docResponse = client.newCall(docRequest).execute()
+                            if (docResponse.isSuccessful) {
+                                val docBody = docResponse.body
+                                if (docBody != null) {
+                                    var docFileName = Uri.parse(attachedDocUrl).lastPathSegment ?: "telegram_document.pdf"
+                                    if (!docFileName.lowercase().endsWith(".pdf")) {
+                                        docFileName += ".pdf"
+                                    }
+                                    return@withContext downloadPdfBodyAndExtract(context, docBody, docFileName, startPage, endPage)
+                                }
+                            }
+                        }
+                    }
+                }
+
                 val extractedText = extractTextFromHtml(htmlContent, urlString)
-                val displayTitle = if (urlString.contains("t.me/")) {
+                val displayTitle = if (isTelegramPostLink) {
                     // Try to extract channel name if possible, e.g. from t.me/channel/123
                     val uri = Uri.parse(urlString)
                     val segments = uri.pathSegments

@@ -28,7 +28,7 @@ interface StudyRepository {
     fun getAllQuizSets(): Flow<List<VocabQuizSet>>
     suspend fun getQuizSetByDate(date: String): VocabQuizSet?
     suspend fun getQuizSetById(id: Int): VocabQuizSet?
-    suspend fun createQuizSet(quizSet: VocabQuizSet, questions: List<VocabQuizQuestion>)
+    suspend fun createQuizSet(quizSet: VocabQuizSet, questions: List<VocabQuizQuestion>): Int
     fun getQuestionsForQuizSet(quizSetId: Int): Flow<List<VocabQuizQuestion>>
     suspend fun updateQuizQuestion(question: VocabQuizQuestion)
     suspend fun resetQuizSet(quizSetId: Int)

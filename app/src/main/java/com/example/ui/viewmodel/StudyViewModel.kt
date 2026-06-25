@@ -271,10 +271,10 @@ class StudyViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
 
-                repository.createQuizSet(quizSet, vocabQuestions)
+                val newQuizSetId = repository.createQuizSet(quizSet, vocabQuestions)
                 
                 // Fetch the created quiz set to set as active
-                val createdQuizSet = repository.getQuizSetByDate(today)
+                val createdQuizSet = repository.getQuizSetById(newQuizSetId)
                 if (createdQuizSet != null) {
                     selectQuizSet(createdQuizSet)
                 }
@@ -324,10 +324,10 @@ class StudyViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
 
-                repository.createQuizSet(quizSet, vocabQuestions)
+                val newQuizSetId = repository.createQuizSet(quizSet, vocabQuestions)
                 
                 // Fetch the created quiz set to set as active
-                val createdQuizSet = repository.getQuizSetByDate(today)
+                val createdQuizSet = repository.getQuizSetById(newQuizSetId)
                 if (createdQuizSet != null) {
                     selectQuizSet(createdQuizSet)
                 }
@@ -433,9 +433,9 @@ class StudyViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
 
-                repository.createQuizSet(quizSet, vocabQuestions)
+                val newQuizSetId = repository.createQuizSet(quizSet, vocabQuestions)
                 
-                val createdQuizSet = repository.getQuizSetByDate(today)
+                val createdQuizSet = repository.getQuizSetById(newQuizSetId)
                 if (createdQuizSet != null) {
                     selectQuizSet(createdQuizSet)
                 }

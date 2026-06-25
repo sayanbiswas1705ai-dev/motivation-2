@@ -116,10 +116,11 @@ class StudyRepositoryImpl(private val studyDao: StudyDao) : StudyRepository {
         return studyDao.getQuizSetById(id)
     }
 
-    override suspend fun createQuizSet(quizSet: VocabQuizSet, questions: List<VocabQuizQuestion>) {
+    override suspend fun createQuizSet(quizSet: VocabQuizSet, questions: List<VocabQuizQuestion>): Int {
         val quizSetId = studyDao.insertQuizSet(quizSet).toInt()
         val questionsWithId = questions.map { it.copy(quizSetId = quizSetId) }
         studyDao.insertQuizQuestions(questionsWithId)
+        return quizSetId
     }
 
     override fun getQuestionsForQuizSet(quizSetId: Int): Flow<List<VocabQuizQuestion>> {
